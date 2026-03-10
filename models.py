@@ -13,7 +13,7 @@ class Bigram:
     def fit(self, X):
         for word in X:
             input = ['.'] + list(word) + ['.']
-            for (first, second) in zip(input, input[1:]):
+            for first, second in zip(input, input[1:]):
                 ix1 = self._stoi[first]
                 ix2 = self._stoi[second]
 
@@ -54,3 +54,19 @@ class Bigram:
             results.append(''.join(out))
 
         return results
+
+    def loss(self, X):
+        log_likelihood = 0.0
+        n = 0
+
+        for word in X:
+            chars = ['.'] + list(word) + ['.']
+            for first, second in zip(chars, chars[1:]):
+                ix1 = self._stoi[first]
+                ix2 = self._stoi[second]
+
+                p = self._P[ix1, ix2]
+                log_likelihood += -torch.log(p)
+                n += 1
+
+        return (log_likelihood / n).item()
