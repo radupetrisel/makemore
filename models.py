@@ -1,0 +1,56 @@
+import torch
+import string
+import matplotlib.pyplot as plt
+
+class Bigram:
+
+    def __init__(self):
+        self._P = torch.ones(size=(27, 27))
+        self._stoi = {s: i+1 for i, s in enumerate(string.ascii_lowercase)}
+        self._stoi['.'] = 0
+        self._itos = {i: s for s, i in self._stoi.items()}
+
+    def fit(self, X):
+        for word in X:
+            input = ['.'] + list(word) + ['.']
+            for (first, second) in zip(input, input[1:]):
+                ix1 = self._stoi[first]
+                ix2 = self._stoi[second]
+
+                self._P[ix1, ix2] += 1
+
+        row_sum = self._P.sum(dim=1, keepdim=True)
+        self._P /= row_sum
+
+    def show_probs(self):
+        plt.figure(figsize=(16, 16))
+        plt.imshow(self._P, cmap='Blues')
+        for i in range(27):
+            for j in range(27):
+                chstr = self._itos[i] + self._itos[j]
+                plt.text(j, i, chstr, ha="center", va="bottom", color='gray')
+                plt.text(j, i, f"{self._P[i, j].item():.4f}", ha="center", va="top", color='gray')
+        plt.axis('off')
+
+    def make(self, count=5):
+        results = []
+
+        generator = torch.Generator()
+        generator.manual_seed(1234)
+
+        for _ in range(count):
+            out = []
+            idx = 0
+
+            while True:
+                multinomial = torch.multinomial(self._P[idx], num_samples=1, replacement=True, generator=generator)
+                idx = multinomial.item()
+
+                out.append(self._itos[idx])
+
+                if idx == 0:
+                    break
+
+            results.append(''.join(out))
+
+        return results
