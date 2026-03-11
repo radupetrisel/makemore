@@ -70,3 +70,52 @@ class Bigram:
                 n += 1
 
         return (log_likelihood / n).item()
+
+import torch.nn.functional as F
+class NN:
+
+    def __init__(self, generator):
+        self._W = torch.randn((27, 27), requires_grad=True, generator=generator)
+        self._itos = {(i+1): s for i, s in enumerate(string.ascii_lowercase)}
+        self._itos[0] = '.'
+
+    def fit(self, X, y, num_epocs=200, learning_rate=50):
+        xenc = F.one_hot(X, num_classes=27).float()
+        num = len(X)
+
+        loss = 0.0
+        for epoch in range(num_epocs):
+            logits = xenc @ self._W
+            counts = logits.exp()
+            probs = counts / counts.sum(dim=1, keepdim=True)
+
+            loss = -probs[torch.arange(num), y].log().mean()
+
+            self._W.grad = None
+            loss.backward()
+
+            self._W.data += -learning_rate * self._W.grad
+
+        print(f'Loss={loss.item():.4f}')
+
+    def make(self, count=5, generator=torch.Generator()):
+        results = []
+
+        for _ in range(count):
+            idx = 0
+            out = []
+            while True:
+                xenc = F.one_hot(torch.tensor([idx]), num_classes=27).float()
+                logits = xenc @ self._W
+                counts = logits.exp()
+                probs = counts / counts.sum(dim=1, keepdim=True)
+
+                idx = torch.multinomial(probs, num_samples=1, replacement=True, generator=generator).item()
+
+                out.append(self._itos[idx])
+                if idx == 0:
+                    break
+
+            results.append(''.join(out))
+
+        return results
