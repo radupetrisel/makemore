@@ -1,6 +1,7 @@
 import torch
 import string
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 class Bigram:
 
@@ -71,17 +72,27 @@ class Bigram:
 
         return (log_likelihood / n).item()
 
-import torch.nn.functional as F
 class NN:
 
     def __init__(self, generator):
         self._W = torch.randn((27, 27), requires_grad=True, generator=generator)
-        self._itos = {(i+1): s for i, s in enumerate(string.ascii_lowercase)}
-        self._itos[0] = '.'
+        self._stoi = {s: i + 1 for i, s in enumerate(string.ascii_lowercase)}
+        self._stoi['.'] = 0
+        self._itos = {i: s for s, i in self._stoi.items()}
 
-    def fit(self, X, y, num_epocs=200, learning_rate=50):
-        xenc = F.one_hot(X, num_classes=27).float()
-        num = len(X)
+    def fit(self, data, num_epocs=200, learning_rate=50):
+        Xs, ys = [], []
+        # prepare the dataset
+        for word in data:
+            chars = ['.'] + list(word) + ['.']
+            for x, y in zip(chars, chars[1:]):
+                Xs.append(self._stoi[x])
+                ys.append(self._stoi[y])
+
+        Xs = torch.tensor(Xs)
+        ys = torch.tensor(ys)
+        xenc = F.one_hot(Xs, num_classes=27).float()
+        num = len(Xs)
 
         loss = 0.0
         for epoch in range(num_epocs):
@@ -89,7 +100,7 @@ class NN:
             counts = logits.exp()
             probs = counts / counts.sum(dim=1, keepdim=True)
 
-            loss = -probs[torch.arange(num), y].log().mean()
+            loss = -probs[torch.arange(num), ys].log().mean()
 
             self._W.grad = None
             loss.backward()
