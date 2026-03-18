@@ -130,3 +130,57 @@ class NN:
             results.append(''.join(out))
 
         return results
+
+class Linear:
+    def __init__(self, fan_in, fan_out, generator, gain = 1.0, bias = True):
+        self.weight = torch.randn((fan_in, fan_out), generator=generator) * gain / (fan_in ** 0.5)
+        self.bias = torch.zeros(fan_out) if bias else None
+
+    def __call__(self, x):
+        self.out = x @ self.weight
+
+        if self.bias is not None:
+            self.out += self.bias
+
+        return self.out
+
+    def parameters(self):
+        return [self.weight] + ([self.bias] if self.bias is not None else [])
+
+class BatchNorm1d:
+    def __init__(self, dim, eps = 1e-5, momentum = 0.1):
+        self.training = True
+        self.eps = eps
+        self.momentum = momentum
+
+        self.scale = torch.ones(dim)
+        self.shift = torch.zeros(dim)
+
+        self.mean = torch.zeros(dim)
+        self.var = torch.ones(dim)
+
+    def __call__(self, x):
+        if self.training:
+            mean = x.mean(0, keepdim=True)
+            var = x.var(0, keepdim=True)
+            self.out = self.scale * (x - mean) / torch.sqrt(var + self.eps) + self.shift
+
+            with torch.no_grad():
+                self.mean = self.mean * (1 - self.momentum) + mean * self.momentum
+                self.var = self.var * (1 - self.momentum) + var * self.momentum
+
+        else:
+            self.out = self.scale * (x - self.mean) / torch.sqrt(self.var + self.eps) + self.shift
+
+        return self.out
+
+    def parameters(self):
+        return [self.scale, self.shift]
+
+class Tanh:
+    def __call__(self, x):
+        self.out = torch.tanh(x)
+        return self.out
+
+    def parameters(self):
+        return []
