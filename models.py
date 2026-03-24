@@ -161,8 +161,13 @@ class BatchNorm1d:
 
     def __call__(self, x):
         if self.training:
-            mean = x.mean(0, keepdim=True)
-            var = x.var(0, keepdim=True)
+            if x.ndim == 2:
+                dim = 0
+            elif x.ndim == 3:
+                dim = (0, 1)
+
+            mean = x.mean(dim, keepdim=True)
+            var = x.var(dim, keepdim=True)
             self.out = self.scale * (x - mean) / torch.sqrt(var + self.eps) + self.shift
 
             with torch.no_grad():
@@ -184,3 +189,45 @@ class Tanh:
 
     def parameters(self):
         return []
+
+class Embedding:
+
+    def __init__(self, fan_in, fan_out):
+        self.weights = torch.randn((fan_in, fan_out))
+
+    def __call__(self, x):
+        self.out = self.weights[x]
+        return self.out
+
+    def parameters(self):
+        return [self.weights]
+
+class FlattenConsecutive:
+
+    def __init__(self, n):
+        self.n = n
+
+    def __call__(self, x):
+        B, T, C = x.shape
+        self.out = x.view(B, T // self.n, C * self.n)
+        if self.out.shape[1] == 1:
+            self.out = self.out.squeeze(1)
+
+        return self.out
+
+    def parameters(self):
+        return []
+
+class Sequential:
+    def __init__(self, layers):
+        self.layers = layers
+
+    def __call__(self, x):
+        for layer in self.layers:
+            x = layer(x)
+
+        self.out = x
+        return self.out
+
+    def parameters(self):
+        return [p for layer in self.layers for p in layer.parameters()]
