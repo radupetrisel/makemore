@@ -224,18 +224,18 @@ class Convolution1D:
         self.bias = torch.zeros(fan_out) if bias else None
         self.kernel_size = kernel_size
 
-    def __call__(self, x):
+    def __call__(self, x: torch.Tensor):
         B, T, C_in = x.shape
         T_out = T - self.kernel_size + 1
-        C_out = self.weight.shape[2]
 
-        self.out = torch.zeros((B, T_out, C_out))
+        s = x.stride() # B_stride, T_stride, C_stride
+        windows = x.as_strided(size=(B, T_out, self.kernel_size, C_in),
+                               stride=(s[0], s[1], s[1], s[2]))
 
-        for t in range(T_out):
-            current = x[:, t:t + self.kernel_size, :] # (B, kernel_size, C_in)
+        self.out = torch.einsum('btpi,pio->bto', windows, self.weight)
 
-            for k in range(self.kernel_size):
-                self.out[:, t, :] += (current @ self.weight[k]).sum(1, keepdim=True).squeeze(1) # (B, 1, C_out)
+        if self.bias is not None:
+            self.out += self.bias
 
         # (B, T_out, fan_out)
         return self.out
