@@ -218,6 +218,31 @@ class FlattenConsecutive:
     def parameters(self):
         return []
 
+class Convolution1D:
+    def __init__(self, fan_in, fan_out, kernel_size, generator=torch.Generator(), gain=1.0, bias=True):
+        self.weight = torch.randn((kernel_size, fan_in, fan_out), generator=generator) * gain / ((fan_in * kernel_size) ** 0.5)
+        self.bias = torch.zeros(fan_out) if bias else None
+        self.kernel_size = kernel_size
+
+    def __call__(self, x):
+        B, T, C_in = x.shape
+        T_out = T - self.kernel_size + 1
+        C_out = self.weight.shape[2]
+
+        self.out = torch.zeros((B, T_out, C_out))
+
+        for t in range(T_out):
+            current = x[:, t:t + self.kernel_size, :] # (B, kernel_size, C_in)
+
+            for k in range(self.kernel_size):
+                self.out[:, t, :] += (current @ self.weight[k]).sum(1, keepdim=True).squeeze(1) # (B, 1, C_out)
+
+        # (B, T_out, fan_out)
+        return self.out
+
+    def parameters(self):
+        return [self.weight] + ([self.bias] if self.bias is not None else [])
+
 class Sequential:
     def __init__(self, layers):
         self.layers = layers
